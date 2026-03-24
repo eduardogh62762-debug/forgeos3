@@ -1,12 +1,13 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard, Cpu, Archive, Shield, Eye, CheckSquare,
   Settings, Zap, LogOut, GitBranch, RefreshCw, BookOpen,
   ChevronRight, ChevronsLeft, ChevronsRight, Menu, X, Box,
-  ChevronDown
+  Skull, Activity
 } from 'lucide-react'
 import { useAuthStore } from '../../store/authStore'
+import { useAgentStore } from '../../store/agentStore'
 
 const PLATFORM = [
   { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -19,16 +20,17 @@ const GOVERNANCE = [
   { to: '/gateway', icon: GitBranch, label: 'Tool Gateway' },
   { to: '/loopguard', icon: RefreshCw, label: 'Loop Guard' },
   { to: '/sandbox', icon: Box, label: 'Sandbox' },
+  { to: '/attack-simulator', icon: Skull, label: 'Attack Simulator' },
 ]
 
 const OBSERVABILITY = [
   { to: '/sentinel', icon: Eye, label: 'Sentinel' },
+  { to: '/security-pulse', icon: Activity, label: 'Security Pulse' },
   { to: '/audit', icon: BookOpen, label: 'Audit Trail' },
   { to: '/approvals', icon: CheckSquare, label: 'Approvals' },
 ]
 
 type OpenGroup = 'governance' | 'observability' | null
-type ConnectionStatus = 'connected' | 'disconnected' | 'connecting'
 
 function NavContent({
   openGroup, toggleGroup, userMenu, setUserMenu, onNavClick, logout, user, navigate,
@@ -162,53 +164,36 @@ function NavContent({
   )
 }
 
-function ConnectionBadge({ status, onClick }: { status: ConnectionStatus; onClick: () => void }) {
-  const configs = {
-    connected: {
-      dot: 'bg-forge-green animate-pulse',
-      text: 'text-forge-green',
-      bg: 'bg-forge-green/5 border-forge-green/15',
-      label: 'OpenClaw · Connected',
-    },
-    disconnected: {
-      dot: 'bg-forge-red',
-      text: 'text-forge-red',
-      bg: 'bg-forge-red/5 border-forge-red/15',
-      label: 'OpenClaw · Disconnected',
-    },
-    connecting: {
-      dot: 'bg-forge-amber animate-pulse',
-      text: 'text-forge-amber',
-      bg: 'bg-forge-amber/5 border-forge-amber/15',
-      label: 'OpenClaw · Connecting...',
-    },
-  }
-  const c = configs[status]
+function ConnectionBadge({ isLive }: { isLive: boolean }) {
+  const cfg = isLive
+    ? { dot: 'bg-forge-green animate-pulse', text: 'text-forge-green', bg: 'bg-forge-green/5 border-forge-green/15', label: 'OpenClaw · Connected' }
+    : { dot: 'bg-forge-red', text: 'text-forge-red', bg: 'bg-forge-red/5 border-forge-red/15', label: 'OpenClaw · Offline' }
   return (
-    <button
-      onClick={onClick}
-      className={`w-full flex items-center gap-2 px-2.5 py-1.5 border rounded-lg transition-all hover:opacity-80 ${c.bg}`}>
-      <span className={`w-2 h-2 rounded-full shrink-0 ${c.dot}`} />
-      <span className={`text-[11px] font-medium flex-1 text-left ${c.text}`}>{c.label}</span>
-      <ChevronDown size={10} className={c.text} />
-    </button>
+    <div className={`w-full flex items-center gap-2 px-2.5 py-1.5 border rounded-lg ${cfg.bg}`}>
+      <span className={`w-2 h-2 rounded-full shrink-0 ${cfg.dot}`} />
+      <span className={`text-[11px] font-medium flex-1 text-left ${cfg.text}`}>{cfg.label}</span>
+    </div>
   )
 }
 
 export function Sidebar() {
   const { logout, user } = useAuthStore()
+  const { isLive, checkHealth } = useAgentStore()
   const navigate = useNavigate()
   const [openGroup, setOpenGroup] = useState<OpenGroup>(null)
   const [collapsed, setCollapsed] = useState(false)
   const [userMenu, setUserMenu] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [connStatus, setConnStatus] = useState<ConnectionStatus>('connected')
-  const [showConnMenu, setShowConnMenu] = useState(false)
+
+  // Auto health-check every 5s — shows real live status
+  useEffect(() => {
+    checkHealth()
+    const interval = setInterval(checkHealth, 5000)
+    return () => clearInterval(interval)
+  }, [checkHealth])
 
   const toggleGroup = (g: OpenGroup) =>
     setOpenGroup(prev => (prev === g ? null : g))
-
-  const handleConnClick = () => setShowConnMenu(p => !p)
 
   const sharedProps = {
     openGroup, toggleGroup, userMenu, setUserMenu, logout, user, navigate,
@@ -249,19 +234,8 @@ export function Sidebar() {
                 <X size={15} />
               </button>
             </div>
-            <div className="px-5 py-2 border-b border-forge-border relative">
-              <ConnectionBadge status={connStatus} onClick={handleConnClick} />
-              {showConnMenu && (
-                <div className="absolute left-0 right-0 top-full mt-1 bg-forge-surface border border-forge-border rounded-xl overflow-hidden shadow-lg z-20">
-                  {(['connected', 'disconnected', 'connecting'] as ConnectionStatus[]).map(s => (
-                    <button key={s} onClick={() => { setConnStatus(s); setShowConnMenu(false) }}
-                      className={`w-full flex items-center gap-2 px-3 py-2.5 text-[11px] font-medium hover:bg-forge-elevated transition-colors capitalize text-left ${connStatus === s ? 'text-forge-amber' : 'text-forge-secondary'}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${s === 'connected' ? 'bg-forge-green' : s === 'disconnected' ? 'bg-forge-red' : 'bg-forge-amber'}`} />
-                      {s}
-                    </button>
-                  ))}
-                </div>
-              )}
+            <div className="px-5 py-2 border-b border-forge-border">
+              <ConnectionBadge isLive={isLive} />
             </div>
             <NavContent {...sharedProps} onNavClick={() => setMobileOpen(false)} />
           </aside>
@@ -327,19 +301,8 @@ export function Sidebar() {
               <ChevronsLeft size={14} />
             </button>
           </div>
-          <div className="mt-3 relative">
-            <ConnectionBadge status={connStatus} onClick={handleConnClick} />
-            {showConnMenu && (
-              <div className="absolute left-0 right-0 top-full mt-1 bg-forge-surface border border-forge-border rounded-xl overflow-hidden shadow-lg z-20">
-                {(['connected', 'disconnected', 'connecting'] as ConnectionStatus[]).map(s => (
-                  <button key={s} onClick={() => { setConnStatus(s); setShowConnMenu(false) }}
-                    className={`w-full flex items-center gap-2 px-3 py-2.5 text-[11px] font-medium hover:bg-forge-elevated transition-colors capitalize text-left ${connStatus === s ? 'text-forge-amber' : 'text-forge-secondary'}`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${s === 'connected' ? 'bg-forge-green' : s === 'disconnected' ? 'bg-forge-red' : 'bg-forge-amber'}`} />
-                    {s}
-                  </button>
-                ))}
-              </div>
-            )}
+          <div className="mt-3">
+            <ConnectionBadge isLive={isLive} />
           </div>
         </div>
 

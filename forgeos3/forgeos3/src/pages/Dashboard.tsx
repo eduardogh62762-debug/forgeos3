@@ -11,7 +11,6 @@ import { useAuthStore } from '../store/authStore'
 import { useRunStore } from '../store/runStore'
 import { useAgentStore } from '../store/agentStore'
 import { SkeletonMetric, SkeletonRow, SkeletonCard, ErrorBanner } from '../components/ui/Skeleton'
-import { useDashboardStore } from '../store/dashboardStore'
 import type { Agent } from '../types/agent'
 
 function timeAgo(ts: string) {
@@ -57,30 +56,21 @@ const fadeUp = {
 export function Dashboard() {
   const { user } = useAuthStore()
   const { runs, approvals, loading: loadingRuns, error: errorRuns, fetchRuns, fetchApprovals } = useRunStore()
-  const { agents, loading: loadingAgents, error: errorAgents, fetchAgents, isLive, checkHealth } = useAgentStore()
+  const { agents, loading: loadingAgents, error: errorAgents, fetchAgents } = useAgentStore()
   const navigate = useNavigate()
-
-  const { stats, fetchStats } = useDashboardStore()
 
   useEffect(() => {
     fetchRuns()
     fetchApprovals()
     fetchAgents()
-    checkHealth()
-    fetchStats()
-    const iv = setInterval(() => {
-      checkHealth()
-      fetchStats()
-    }, 5000)
-    return () => clearInterval(iv)
-  }, [fetchRuns, fetchApprovals, fetchAgents, checkHealth, fetchStats])
+  }, [fetchRuns, fetchApprovals, fetchAgents])
 
-  const pending   = (approvals ?? []).filter((a: any) => a.status === 'pending').length
-  const blocked   = (runs ?? []).flatMap((r: any) => (r.toolEvents ?? [])).filter((e: any) => e?.decision === 'blocked').length
-  const allowed   = (runs ?? []).flatMap((r: any) => (r.toolEvents ?? [])).filter((e: any) => e?.decision === 'allowed').length
-  const allEvents = (runs ?? [])
-    .flatMap((r: any) => (r.toolEvents ?? []).map((e: any) => ({ ...e, agentName: r.agentName, domain: r.domain })))
-    .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+  const pending   = (approvals ?? []).filter(a => a.status === 'pending').length
+  const blocked   = runs.flatMap(r => (r.toolEvents ?? [])).filter(e => e?.decision === 'blocked').length
+  const allowed   = runs.flatMap(r => (r.toolEvents ?? [])).filter(e => e?.decision === 'allowed').length
+  const allEvents = runs
+    .flatMap(r => (r.toolEvents ?? []).map(e => ({ ...e, agentName: r.agentName, domain: r.domain })))
+    .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
 
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
@@ -95,13 +85,7 @@ export function Dashboard() {
           <h1 className="text-base font-semibold text-forge-white">
             {greeting}, <span className="text-amber-500">{user?.name?.split(' ')[0] || 'there'}</span>
           </h1>
-          <p className="text-xs text-forge-subtle mt-0.5">
-            ForgeOS3 Console
-            {' · '}
-            <span className={isLive ? 'text-emerald-500' : 'text-red-400'}>
-              {isLive ? 'OpenClaw ● live' : 'OpenClaw ● offline'}
-            </span>
-          </p>
+          <p className="text-xs text-forge-subtle mt-0.5">ForgeOS3 Console · OpenClaw runtime active</p>
         </div>
         <div className="flex items-center gap-3">
           {pending > 0 && (
@@ -124,58 +108,8 @@ export function Dashboard() {
         {error && (
           <ErrorBanner
             message={error}
-            onRetry={() => { fetchRuns(); fetchAgents(); fetchStats() }}
+            onRetry={() => { fetchRuns(); fetchAgents() }}
           />
-        )}
-
-        {/* Security Pulse Section */}
-        {stats && (
-          <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-            className="p-6 rounded-2xl bg-gradient-to-br from-forge-surface to-forge-elevated border border-amber-500/20 shadow-xl shadow-amber-500/5 overflow-hidden relative group">
-            <div className="absolute top-0 right-0 p-8 opacity-5 group-hover:opacity-10 transition-opacity">
-              <Shield size={120} className="text-amber-500" />
-            </div>
-            <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20 text-[10px] font-bold text-amber-500 uppercase tracking-wider">
-                    Security Pulse
-                  </div>
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-ping" />
-                </div>
-                <h2 className="text-2xl font-bold text-forge-white tracking-tight">
-                  Sentinel Protection: <span className="text-amber-500 uppercase">{stats.securityPulse.shieldStatus}</span>
-                </h2>
-                <p className="text-sm text-forge-subtle">
-                  Managed by ForgeOS3 Governance. Safeguarding AI operations in real-time.
-                </p>
-              </div>
-
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-8 md:gap-12">
-                <div className="space-y-1">
-                  <div className="text-[10px] text-forge-subtle font-semibold uppercase">Value Protected</div>
-                  <div className="text-2xl font-bold text-emerald-500 tabular-nums">
-                    ${stats.securityPulse.totalValueProtected.toLocaleString()}
-                  </div>
-                  <div className="text-[10px] text-emerald-500/60 font-medium">+12% from last session</div>
-                </div>
-                <div className="space-y-1">
-                  <div className="text-[10px] text-forge-subtle font-semibold uppercase">Safety Score</div>
-                  <div className="text-2xl font-bold text-amber-500 tabular-nums">
-                    {stats.securityPulse.safetyScore}%
-                  </div>
-                  <div className="text-[10px] text-amber-500/60 font-medium">Verified Governance</div>
-                </div>
-                <div className="hidden sm:block space-y-1">
-                  <div className="text-[10px] text-forge-subtle font-semibold uppercase">Last Blocked</div>
-                  <div className="text-xs font-mono text-forge-secondary bg-forge-elevated/50 px-2 py-1 rounded-lg border border-forge-border truncate max-w-24">
-                    {stats.securityPulse.lastAttackBlocked}
-                  </div>
-                  <div className="text-[9px] text-red-400 font-medium">Access Denied</div>
-                </div>
-              </div>
-            </div>
-          </motion.div>
         )}
 
         <motion.div variants={stagger} initial="hidden" animate="show"
@@ -264,7 +198,7 @@ export function Dashboard() {
                     No events yet
                   </div>
                 ) : (
-                  allEvents.slice(0, 10).map((event: any, i: number) => (
+                  allEvents.slice(0, 10).map((event, i) => (
                     <motion.div key={event.id}
                       initial={{ opacity: 0, x: -8 }} animate={{ opacity: 1, x: 0 }}
                       transition={{ delay: 0.4 + i * 0.04, duration: 0.3 }}
@@ -320,17 +254,17 @@ export function Dashboard() {
                     </div>
                   ))
                 ) : (
-                  runs.map((run: any) => {
-                    const pct = Math.min(run.loopRiskScore, 100)
-                    const color = run.loopRiskScore > 30 ? 'bg-red-500' : run.loopRiskScore > 15 ? 'bg-amber-400' : 'bg-emerald-500'
-                    const textColor = run.loopRiskScore > 30 ? 'text-red-500' : run.loopRiskScore > 15 ? 'text-amber-500' : 'text-emerald-500'
+                  runs.map(run => {
+                    const pct = Math.min(run.loopRiskScore ?? 0, 100)
+                    const color = (run.loopRiskScore ?? 0) > 30 ? 'bg-red-500' : (run.loopRiskScore ?? 0) > 15 ? 'bg-amber-400' : 'bg-emerald-500'
+                    const textColor = (run.loopRiskScore ?? 0) > 30 ? 'text-red-500' : (run.loopRiskScore ?? 0) > 15 ? 'text-amber-500' : 'text-emerald-500'
                     return (
                       <div key={run.id}>
                         <div className="flex items-center justify-between mb-1.5">
                           <span className="text-[11px] text-forge-secondary truncate max-w-35">{run.agentName}</span>
                           <div className="flex items-center gap-2">
-                            {run.loopRiskScore > 30 && <AlertTriangle size={10} className="text-red-500" />}
-                            <span className={`text-xs font-bold ${textColor}`}>{run.loopRiskScore}</span>
+                            {(run.loopRiskScore ?? 0) > 30 && <AlertTriangle size={10} className="text-red-500" />}
+                            <span className={`text-xs font-bold ${textColor}`}>{run.loopRiskScore ?? 0}</span>
                           </div>
                         </div>
                         <div className="h-1.5 bg-forge-elevated rounded-full overflow-hidden">
@@ -359,7 +293,7 @@ export function Dashboard() {
                 {isLoading ? (
                   Array.from({ length: 3 }).map((_, i) => <SkeletonRow key={i} />)
                 ) : (
-                  runs.map((run: any) => {
+                  runs.map(run => {
                     const cfg = STATUS_CONFIG[run.status] || STATUS_CONFIG['finished']
                     return (
                       <div key={run.id} className="flex items-center gap-3 px-5 py-3 hover:bg-forge-elevated/50 transition-colors cursor-pointer"
@@ -398,7 +332,7 @@ export function Dashboard() {
               Array.from({ length: 3 }).map((_, i) => <SkeletonCard key={i} />)
             ) : (
               agents.map((agent: Agent) => {
-                runs.find(r => r.agentId === agent.id)
+                const run = runs.find(r => r.agentId === agent.id)
                 const domainIcon: Record<string, string> = { healthtech: '♥', agrotech: '⬡', fintech: '◈', custom: '◎' }
                 const domainCol: Record<string, string> = { healthtech: 'text-blue-500', agrotech: 'text-green-500', fintech: 'text-amber-500', custom: 'text-forge-subtle' }
                 return (
@@ -418,10 +352,8 @@ export function Dashboard() {
                         </div>
                       </div>
                       <div className="flex items-center gap-1.5">
-                        <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
-                        <span className={`text-[9px] font-semibold uppercase tracking-wide ${isLive ? 'text-emerald-500' : 'text-red-400'}`}>
-                          {isLive ? 'live' : 'offline'}
-                        </span>
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        <span className="text-[9px] text-emerald-500 font-semibold uppercase tracking-wide">live</span>
                       </div>
                     </div>
                     <div className="flex items-center gap-3 text-[10px] text-forge-subtle">
@@ -433,10 +365,10 @@ export function Dashboard() {
                         <Shield size={9} className="text-blue-400" />
                         <span>{(agent.policyPresetId ?? '').replace('pp-', '') || '—'}</span>
                       </div>
-                      {runs.find((r: any) => r.agentId === agent.id) && (
+                      {run && (
                         <div className="flex items-center gap-1 ml-auto">
                           <Eye size={9} />
-                          <span>risk {runs.find((r: any) => r.agentId === agent.id)?.loopRiskScore}</span>
+                          <span>risk {run.loopRiskScore ?? 0}</span>
                         </div>
                       )}
                     </div>

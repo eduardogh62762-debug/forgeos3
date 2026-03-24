@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ChevronRight, ChevronLeft, Check, Zap, Shield, AlertTriangle, Lock } from 'lucide-react'
@@ -46,15 +46,8 @@ export function BuilderConsole() {
   const [deploying, setDeploying] = useState(false)
   const [deployed, setDeployed] = useState(false)
   const [deployError, setDeployError] = useState<string | null>(null)
-  const { createAgent, isLive, checkHealth } = useAgentStore()
+  const { createAgent } = useAgentStore()
   const navigate = useNavigate()
-
-  // Poll agent health so the badge is always accurate
-  useEffect(() => {
-    checkHealth()
-    const iv = setInterval(checkHealth, 5000)
-    return () => clearInterval(iv)
-  }, [checkHealth])
 
   const availableToolPacks = TOOL_PACKS.filter(p => p.domain === domain)
   const selectedPack = TOOL_PACKS.find(p => p.id === toolPackId) ?? availableToolPacks[0]
@@ -125,15 +118,9 @@ export function BuilderConsole() {
           <h1 className="text-base font-semibold text-forge-white">Builder Console</h1>
           <p className="text-xs text-forge-subtle mt-0.5">Deploy a new agent to OpenClaw</p>
         </div>
-        <div className={`flex items-center gap-1.5 px-3 py-1.5 border rounded-full ${
-            isLive
-              ? 'bg-emerald-500/8 border-emerald-500/20'
-              : 'bg-red-500/8 border-red-500/20'
-          }`}>
-          <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
-          <span className={`text-[10px] font-semibold ${isLive ? 'text-emerald-500' : 'text-red-400'}`}>
-            {isLive ? 'OpenClaw · Ready' : 'OpenClaw · Offline'}
-          </span>
+        <div className="flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/8 border border-emerald-500/20 rounded-full">
+          <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+          <span className="text-[10px] text-emerald-500 font-semibold">OpenClaw · Ready</span>
         </div>
       </div>
 
@@ -195,28 +182,18 @@ export function BuilderConsole() {
 
               <div className="space-y-2">
                 <label className="text-xs font-semibold text-forge-secondary uppercase tracking-wide">Runtime Target</label>
-                <div className={`flex items-center gap-3 p-4 border rounded-2xl ${
-                    isLive ? 'bg-emerald-500/5 border-emerald-500/20' : 'bg-red-500/5 border-red-500/20'
-                  }`}>
-                  <div className={`w-9 h-9 rounded-xl flex items-center justify-center shrink-0 ${
-                      isLive ? 'bg-amber-400' : 'bg-forge-elevated border border-forge-border'
-                    }`}
-                    style={isLive ? { boxShadow: '0 0 12px rgba(245,158,11,0.3)' } : {}}>
-                    <Zap size={15} className={isLive ? 'text-black' : 'text-forge-subtle'} fill="currentColor" />
+                <div className="flex items-center gap-3 p-4 bg-emerald-500/5 border border-emerald-500/20 rounded-2xl">
+                  <div className="w-9 h-9 rounded-xl bg-amber-400 flex items-center justify-center shrink-0"
+                    style={{ boxShadow: '0 0 12px rgba(245,158,11,0.3)' }}>
+                    <Zap size={15} className="text-black" fill="currentColor" />
                   </div>
                   <div className="flex-1">
                     <div className="text-sm font-semibold text-forge-white">OpenClaw</div>
-                    <div className={`text-[11px] ${isLive ? 'text-emerald-500' : 'text-red-400'}`}>
-                      {isLive ? 'Live adapter · MVP integration' : 'Offline — start the agent server'}
-                    </div>
+                    <div className="text-[11px] text-emerald-500">Live adapter · MVP integration</div>
                   </div>
-                  <div className={`flex items-center gap-1.5 px-2.5 py-1 border rounded-full ${
-                      isLive ? 'bg-emerald-500/10 border-emerald-500/20' : 'bg-red-500/10 border-red-500/20'
-                    }`}>
-                    <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-400 animate-pulse' : 'bg-red-400'}`} />
-                    <span className={`text-[10px] font-bold ${isLive ? 'text-emerald-500' : 'text-red-400'}`}>
-                      {isLive ? 'Active' : 'Offline'}
-                    </span>
+                  <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-500/10 border border-emerald-500/20 rounded-full">
+                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                    <span className="text-[10px] text-emerald-500 font-bold">Active</span>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2">

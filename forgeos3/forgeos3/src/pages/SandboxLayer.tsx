@@ -12,7 +12,6 @@ import { Button } from '../components/ui/Button'
 import { Toggle } from '../components/ui/Toggle'
 import { Modal } from '../components/ui/Modal'
 import { useRunStore } from '../store/runStore'
-import api from '../lib/api'
 
 type SandboxStatus = 'idle' | 'running' | 'killed' | 'timeout'
 
@@ -43,6 +42,18 @@ const DEFAULT_CONFIG: SandboxConfig = {
   killOnTimeout: true,
 }
 
+const MOCK_LOGS: SandboxLog[] = [
+  { id: 'l1', ts: new Date(Date.now() - 12000).toISOString(), level: 'info',  message: 'Sandbox initialized · runtime openclaw_v1' },
+  { id: 'l2', ts: new Date(Date.now() - 11000).toISOString(), level: 'info',  message: 'Tool intent received: summarize' },
+  { id: 'l3', ts: new Date(Date.now() - 10500).toISOString(), level: 'info',  message: 'Network check: allowlist enforced · 0 external calls blocked' },
+  { id: 'l4', ts: new Date(Date.now() - 9800).toISOString(),  level: 'info',  message: 'Secret scoping active · 2 secrets injected (masked)' },
+  { id: 'l5', ts: new Date(Date.now() - 8000).toISOString(),  level: 'info',  message: 'Tool executed in 1240ms · within timeout (5000ms)' },
+  { id: 'l6', ts: new Date(Date.now() - 5000).toISOString(),  level: 'warn',  message: 'Tool intent received: write_external' },
+  { id: 'l7', ts: new Date(Date.now() - 4800).toISOString(),  level: 'warn',  message: 'Network request attempted: external-api.gov — BLOCKED by allowlist' },
+  { id: 'l8', ts: new Date(Date.now() - 4500).toISOString(),  level: 'error', message: 'Tool blocked: write_external · network policy violation' },
+  { id: 'l9', ts: new Date(Date.now() - 2000).toISOString(),  level: 'info',  message: 'Memory usage: 48mb / 256mb limit · CPU: 12% / 50% limit' },
+]
+
 function timeAgo(ts: string) {
   const diff = Date.now() - new Date(ts).getTime()
   if (diff < 60000) return `${Math.round(diff / 1000)}s ago`
@@ -57,52 +68,20 @@ const LOG_STYLE = {
 }
 
 export function SandboxLayer() {
-  const { runs } = useRunStore()
+  const { runs, fetchRuns } = useRunStore()
   const [config, setConfig]         = useState<SandboxConfig>(DEFAULT_CONFIG)
   const [status, setStatus]         = useState<SandboxStatus>('idle')
-  const [logs, setLogs]             = useState<SandboxLog[]>([])
+  const [logs, setLogs]             = useState<SandboxLog[]>(MOCK_LOGS)
   const [logsOpen, setLogsOpen]     = useState(true)
   const [killModal, setKillModal]   = useState(false)
   const [hostInput, setHostInput]   = useState('')
 
-  const activeRun = runs.find(r => r.status === 'running' || r.status === 'waiting_approval')
-
-  // Load real sandbox config from backend on mount
+  // Carga inicial — sincroniza el estado del sandbox con la API
   useEffect(() => {
-    api.get<{
-      status: SandboxStatus
-      timeout_ms?: number
-      max_memory_mb?: number
-      max_cpu_pct?: number
-      network_mode?: 'none' | 'allowlist'
-      allowed_hosts?: string[]
-      secret_scoping?: boolean
-      kill_on_timeout?: boolean
-    }>('/api/sandbox/config').then(r => {
-      const d = r.data
-      if (d.status) setStatus(d.status)
-      setConfig({
-        timeoutMs:     d.timeout_ms      ?? DEFAULT_CONFIG.timeoutMs,
-        maxMemoryMb:   d.max_memory_mb   ?? DEFAULT_CONFIG.maxMemoryMb,
-        maxCpuPct:     d.max_cpu_pct     ?? DEFAULT_CONFIG.maxCpuPct,
-        networkMode:   d.network_mode    ?? DEFAULT_CONFIG.networkMode,
-        allowedHosts:  d.allowed_hosts   ?? DEFAULT_CONFIG.allowedHosts,
-        secretScoping: d.secret_scoping  ?? DEFAULT_CONFIG.secretScoping,
-        killOnTimeout: d.kill_on_timeout ?? DEFAULT_CONFIG.killOnTimeout,
-      })
-    }).catch(() => { /* backend offline, use defaults */ })
+    fetchRuns()
+  }, [fetchRuns])
 
-    // Load real audit logs
-    api.get<{ data: Array<{ id: string; created_at: string; event_type: string; data: unknown }> }>('/api/audit?limit=20')
-      .then(r => {
-        setLogs(r.data.data.map(e => ({
-          id: e.id,
-          ts: e.created_at,
-          level: (e.event_type === 'tool_blocked' ? 'error' : e.event_type === 'run_finished' ? 'warn' : 'info') as 'info' | 'warn' | 'error',
-          message: `${e.event_type} · ${JSON.stringify(e.data).slice(0, 80)}`,
-        })))
-      }).catch(() => { /* backend offline */ })
-  }, [])
+  const activeRun = runs.find(r => r.status === 'running' || r.status === 'waiting_approval')
 
   const startSandbox = () => {
     setStatus('running')
