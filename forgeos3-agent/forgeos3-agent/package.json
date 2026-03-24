@@ -1,0 +1,31 @@
+{
+  "name": "forgeos3-agent",
+  "version": "0.0.1",
+  "private": true,
+  "scripts": {
+    "dev": "ts-node-dev --respawn src/server.ts",
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "demo:all": "ts-node src/index.ts",
+    "demo:health": "ts-node src/scenarios/healthScenario.ts",
+    "demo:gov": "ts-node src/scenarios/govScenario.ts",
+    "demo:marketing": "ts-node src/scenarios/marketingScenario.ts",
+    "demo:loop": "ts-node src/scenarios/loopScenario.ts"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.80.0",
+    "@supabase/supabase-js": "^2.99.3",
+    "@types/cors": "^2.8.19",
+    "@types/express": "^5.0.6",
+    "axios": "^1.13.6",
+    "cors": "^2.8.6",
+    "dotenv": "^16.6.1",
+    "express": "^5.2.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "ts-node": "^10.0.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.0.0"
+  }
+}
